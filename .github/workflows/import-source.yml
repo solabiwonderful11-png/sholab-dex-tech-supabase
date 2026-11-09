@@ -1,0 +1,44 @@
+name: Import source
+
+# One-time workflow used to bring the project files into the repository.
+# It downloads a source archive, extracts it, and commits the result with the
+# repository's own token. The workflow file is deleted once the import finishes.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download and extract the source archive
+        run: |
+          set -euo pipefail
+          URL="https://suycnxrvnjhmjokxxbjx.supabase.co/storage/v1/object/public/site-media/_import/sholab-source.tar.gz"
+          curl -fsSL "$URL" -o /tmp/src.tgz
+          echo "archive size: $(stat -c%s /tmp/src.tgz) bytes"
+          mkdir -p /tmp/extract
+          tar xzf /tmp/src.tgz -C /tmp/extract
+          echo "extracted files: $(find /tmp/extract -type f | wc -l)"
+          # Copy everything into the repo root, replacing the workflow-only state.
+          cp -a /tmp/extract/. .
+          ls -la
+
+      - name: Commit the imported files
+        run: |
+          set -euo pipefail
+          git config user.name "Sholab Dex Tech"
+          git config user.email "sholabtech@gmail.com"
+          git add -A
+          git commit -m "feat: initial commit — Sholab Dex Tech on Supabase" || echo "nothing to commit"
+          git push origin HEAD:main
