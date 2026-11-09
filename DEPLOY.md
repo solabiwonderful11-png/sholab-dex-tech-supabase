@@ -56,8 +56,11 @@ Open the preview and confirm:
 
 1. Push the repo to GitHub.
 2. In Vercel: **Add New → Project → Import** the repo.
-3. Vercel detects Vite. Leave the build command and output directory as they are
-   (`npm run build`, `dist`) — `vercel.json` already sets them.
+3. **Leave every build setting at its default.** Do not set a Root Directory —
+   the app lives at the repository root, and `vite.config.ts` pins the Vite root
+   and HTML entry to absolute paths so the build does not depend on the working
+   directory. `vercel.json` already sets the install command, build command and
+   output directory.
 4. Add the environment variables:
 
    | Key | Value |
@@ -123,6 +126,14 @@ anon key. Add an authenticated read policy (README › Security, step 2).
 **A save in the panel does not show on the site**
 The site-content query is invalidated on every save, so this should not happen.
 If it does, hard-reload — a CDN or the browser may be serving a cached response.
+
+**`EISDIR: illegal operation on a directory, read` during the build**
+`index.html` has a `<link href>` that resolves to a directory — historically
+`<link rel="canonical" href="/" />`. Vite's `build-html` plugin reads every
+`<link href>` as an asset file. `npm run check:html` (which runs automatically
+as `prebuild`) names the offending tag. Use an absolute URL or a real file path;
+for the canonical link, set `VITE_SITE_URL` instead — `client/src/lib/seo.ts`
+injects it at runtime.
 
 **`/sholab` 404s on the deployed site**
 The SPA rewrite is missing. Confirm `vercel.json` is committed and that the host

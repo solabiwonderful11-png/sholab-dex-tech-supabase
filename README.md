@@ -64,6 +64,7 @@ real content on first run.
 |---|---|
 | `npm run dev` | Vite dev server with HMR |
 | `npm run build` | Typecheck + production bundle into `dist/` |
+| `npm run check:html` | Guard: fails if `index.html` has a `<link href>` Vite cannot read |
 | `npm run preview` | Serve the built bundle locally |
 | `npm run typecheck` | TypeScript only, no emit |
 | `npm test` | Vitest suite |
@@ -91,6 +92,7 @@ client/src/
     supabase.ts    The single Supabase client + media URL helper
     api.ts         Every read and write the app performs
     mappers.ts     Row ⇄ domain translation (snake_case ⇄ camelCase)
+    seo.ts         Runtime canonical / og:url injection
     utils.ts       cn, slugify, formatting
   pages/
     Home.tsx       The public site
@@ -230,18 +232,53 @@ lock down the database as above, tighten the storage write policies the same way
 
 ## Deployment
 
-The site is a static bundle, so any static host works. Vercel is the simplest:
+The site is a static bundle, so any static host works. Vercel is the simplest,
+and it needs **no dashboard configuration at all** — no Root Directory, no
+build-command override, no output-directory override:
 
 1. Push the repo to GitHub.
 2. Import it in Vercel. The framework preset is detected as Vite.
 3. Add the environment variables from `.env.example`.
 4. Deploy.
 
-`vercel.json` handles the SPA rewrite so `/sholab` resolves to `index.html`
+Everything the build needs is committed:
+
+- `vite.config.ts` pins `root` and the Rollup `input` to absolute paths derived
+  from the config file's own location, so the build behaves identically whether
+  it runs from the repo root, a subdirectory, or a CI checkout.
+- `vercel.json` sets `installCommand`, `buildCommand` and `outputDirectory`
+  explicitly, so Vercel's defaults cannot drift.
+- `scripts/check-html.mjs` runs as `prebuild` and fails fast with a readable
+  message if `index.html` ever regains a `<link href>` that resolves to a
+  directory.
+
+### Why the first deploy failed
+
+The original `index.html` contained:
+
+```html
+<link rel="canonical" href="/" />
+```
+
+Vite's `build-html` plugin treats every `<link href>` as an asset reference. It
+resolved `/` against the project root — a **directory** — and then tried to read
+it as a file:
+
+```
+[vite:build-html] EISDIR: illegal operation on a directory, read
+file: /vercel/path0/index.html
+```
+
+This was never a Root Directory problem: the app already lived at the repo root.
+The canonical link is now created at runtime from `VITE_SITE_URL`
+(`client/src/lib/seo.ts`), and `npm run check:html` prevents the pattern from
+coming back.
+
+`vercel.json` also handles the SPA rewrite so `/sholab` resolves to `index.html`
 instead of 404-ing:
 
 ```json
-{ "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }] }
+{ "rewrites": [{ "source": "/((?!assets/).*)", "destination": "/index.html" }] }
 ```
 
 Netlify, Cloudflare Pages and GitHub Pages work the same way — build command
@@ -264,6 +301,8 @@ The suite covers the parts where a bug would be silent rather than loud:
   numbers stored as `+234 816 978 1185`, and price formatting.
 - **`utils.test.ts`** — `cn` merge order, `slugify` (which produces Storage
   object paths, so it must stay within `[a-z0-9-]`), and the textarea parser.
+- **`seo.test.ts`** — the runtime canonical/`og:url` injection that replaced the
+  `<link rel="canonical" href="/">` tag which broke the Vercel build.
 
 ---
 
@@ -276,7 +315,7 @@ The suite covers the parts where a bug would be silent rather than loud:
 | `VITE_SUPABASE_BUCKET` | no | Storage bucket, defaults to `site-media` |
 | `VITE_ADMIN_PATH` | no | Admin route, defaults to `sholab` |
 | `VITE_ADMIN_REQUIRE_AUTH` | no | Set `true` after adding a login gate |
-| `VITE_SITE_URL` | no | Canonical URL for SEO |
+| `VITE_SITE_URL` | no | Canonical URL for SEO (injected at runtime) |
 
 ---
 
