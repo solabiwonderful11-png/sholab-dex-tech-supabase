@@ -15,7 +15,16 @@
       content="website development Nigeria, AI automation, business promotion, WhatsApp chatbot, e-commerce website, social media management, Sholab Dex Tech"
     />
     <meta name="author" content="Sholab Dex Tech" />
-    <link rel="canonical" href="/" />
+
+    <!--
+      NOTE: do NOT put a root-relative asset reference here. Vite's build-html
+      plugin treats every link href as an asset URL, resolves a bare "/"
+      against the project root and then tries to read that path as a file —
+      which is a directory, so the build dies with
+      "EISDIR: illegal operation on a directory, read".
+      The canonical URL is injected at runtime from VITE_SITE_URL instead
+      (see client/src/lib/seo.ts). scripts/check-html.mjs enforces this.
+    -->
 
     <!-- Open Graph -->
     <meta property="og:type" content="website" />
