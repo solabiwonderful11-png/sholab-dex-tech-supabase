@@ -47,22 +47,7 @@ jobs:
             echo "No changes to commit"
             exit 0
           fi
-          git commit -m "feat: implement website brief v2
-
-Implements the client brief across the public site and the /sholab panel:
-
-- WhatsApp smart-quote popup rebuilt to the brief's spec: required name
-  field, service grouped by category, package selector, and the exact
-  pre-filled message wording.
-- Every WhatsApp button now opens that popup with its own selection:
-  nav, hero, each service card, each pricing card, contact, footer and
-  the floating button.
-- Services gained a per-card 'Chat on WhatsApp' button.
-- Pricing gained the package comparison table.
-- Contact gained a map placeholder; Footer gained a discreet Site Control
-  link; README gained a 'How to update this site' guide.
-- Admin panel split into the twelve briefed tabs, adding Media (8.8),
-  SEO (8.9) and Settings with Reset to default (8.10).
-- SEO/favicon/OG tags now applied at runtime from settings.
-- New tests pin the WhatsApp message wording."
+          git commit -F /tmp/commitmsg.txt
           git push origin HEAD:main
+        env:
+          COMMIT_MSG: "feat: implement website brief v2 (WhatsApp quote popup, per-card CTAs, pricing table, admin Media/SEO/Settings tabs)"
