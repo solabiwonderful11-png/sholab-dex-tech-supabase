@@ -138,3 +138,21 @@ injects it at runtime.
 **`/sholab` 404s on the deployed site**
 The SPA rewrite is missing. Confirm `vercel.json` is committed and that the host
 is applying it.
+
+**The deployed site is a blank white page**
+The build shipped without its Supabase environment variables. Vite inlines
+`VITE_*` at build time, so a host with no variables set produces a bundle where
+`VITE_SUPABASE_URL` is `undefined`. The app now shows an explicit "The site is
+not configured yet" screen instead of a blank page, and `scripts/ensure-env.mjs`
+(run automatically as `prebuild`) writes the public defaults when no env file
+exists. To fix it properly, add the variables in **Vercel → Settings →
+Environment Variables** and **redeploy** — changing them without a new build has
+no effect.
+
+**"Site not found" on GitHub Pages**
+A Pages *project* site is served from `https://<user>.github.io/<repo>/`, not
+from the domain root. Build with `VITE_BASE_PATH=/<repo>/` so Vite rewrites the
+asset URLs and the router basename. `.github/workflows/deploy-pages.yml` does
+this automatically and also copies `index.html` to `404.html`, which is the
+standard SPA fallback for Pages (it has no rewrite rules). Pages must be enabled
+under **Settings → Pages → Source: GitHub Actions**.
