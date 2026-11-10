@@ -1,0 +1,82 @@
+name: Deploy to GitHub Pages
+
+# Publishes the built site to GitHub Pages.
+#
+# Two things this workflow has to get right, both of which caused the
+# "Site not found" / blank page the site was reported with:
+#
+#   1. `VITE_BASE_PATH` — a Pages *project* site is served from
+#      https://<user>.github.io/<repo>/, not from the domain root. A bundle
+#      built for "/" requests /assets/… which 404s there. The base path is
+#      passed in so Vite rewrites every asset URL and the router's basename.
+#
+#   2. SPA fallback — Pages has no rewrite rules, so a deep link such as
+#      /sholab would 404. Copying index.html to 404.html makes Pages serve the
+#      app shell for unknown paths, which is the standard SPA workaround.
+#
+# The Supabase values are the public (publishable) ones already committed in
+# .env.example. They are safe in a public workflow: the anon key is designed to
+# ship in the browser bundle and Row Level Security protects the data. If you
+# prefer, move them to repository secrets and reference those instead.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        env:
+          # Pages project sites live under /<repo>/. Keep this in step with the
+          # repository name if you ever rename it.
+          VITE_BASE_PATH: /${{ github.event.repository.name }}/
+          VITE_SUPABASE_URL: https://suycnxrvnjhmjokxxbjx.supabase.co
+          VITE_SUPABASE_ANON_KEY: sb_publishable_RO66cKGx94aBw-kB43f9Mg_4W9-sX0d
+          VITE_SUPABASE_BUCKET: site-media
+          VITE_ADMIN_PATH: sholab
+          VITE_ADMIN_REQUIRE_AUTH: "false"
+          VITE_SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+        run: npm run build
+
+      - name: Add SPA fallback and disable Jekyll
+        run: |
+          cp dist/index.html dist/404.html
+          touch dist/.nojekyll
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -15,10 +15,22 @@ import { fileURLToPath, URL } from "node:url";
 const projectRoot = fileURLToPath(new URL(".", import.meta.url));
 const htmlEntry = fileURLToPath(new URL("./index.html", import.meta.url));
 
+/**
+ * Public base path.
+ *
+ * Vercel serves the site from the domain root, so the default `/` is correct
+ * there. GitHub Pages serves a project site from `/<repo-name>/`, and a bundle
+ * built for `/` would request `/assets/…` — which 404s on Pages and leaves a
+ * blank page. Setting `VITE_BASE_PATH` (e.g. `/sholab-dex-tech-supabase/`) makes
+ * the same source build correctly for either host.
+ */
+const base = process.env.VITE_BASE_PATH?.trim() || "/";
+
 export default defineConfig({
   // The app lives at the repository root, so this is the repo root too. Stated
   // explicitly so Vercel needs no "Root Directory" setting in its dashboard.
   root: projectRoot,
+  base,
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {

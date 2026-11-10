@@ -5,7 +5,8 @@ import { useSiteContent } from "@/hooks/useSiteContent";
 import { Home } from "@/pages/Home";
 import { Admin } from "@/pages/admin/Admin";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { LoadingScreen, ErrorScreen } from "@/components/Screen";
+import { LoadingScreen, ErrorScreen, ConfigScreen } from "@/components/Screen";
+import { configError } from "@/lib/supabase";
 
 /**
  * React Query client.
@@ -37,11 +38,22 @@ function PublicSite() {
 }
 
 export default function App() {
+  // Fail visibly, not blankly. When the build has no Supabase configuration
+  // there is nothing to render, so show an explicit message instead of letting
+  // the app mount and die silently.
+  if (configError) return <ConfigScreen message={configError} />;
+
+  // Vite exposes the configured `base` here. On Vercel it is "/", on a GitHub
+  // Pages project site it is "/<repo>/". BrowserRouter needs it as a basename,
+  // otherwise every route would be resolved against the domain root and the
+  // site would render nothing under a subpath.
+  const basename = import.meta.env.BASE_URL.replace(/\/$/, "") || "/";
+
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
-          <BrowserRouter>
+          <BrowserRouter basename={basename}>
             <Routes>
               <Route path="/" element={<PublicSite />} />
               {/*

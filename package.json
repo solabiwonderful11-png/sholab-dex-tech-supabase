@@ -6,7 +6,7 @@
   "description": "Sholab Dex Tech — websites, AI automation and business promotions. React 19 + Vite + Tailwind 4 on a Supabase backend.",
   "scripts": {
     "dev": "vite",
-    "prebuild": "node scripts/check-html.mjs",
+    "prebuild": "node scripts/ensure-env.mjs && node scripts/check-html.mjs",
     "build": "tsc -b && vite build",
     "check:html": "node scripts/check-html.mjs",
     "preview": "vite preview",

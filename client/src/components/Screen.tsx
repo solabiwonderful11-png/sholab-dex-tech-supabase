@@ -65,3 +65,31 @@ export function ErrorScreen({ error, onRetry }: { error: Error; onRetry: () => v
     </div>
   );
 }
+
+/**
+ * Shown when the build shipped without its Supabase configuration.
+ *
+ * This replaces the old behaviour, where a missing `VITE_SUPABASE_URL` threw at
+ * module load and left the visitor staring at a blank white page. The message
+ * is deliberately explicit about the cause and the fix, because the person who
+ * sees it is usually the owner, not a developer.
+ */
+export function ConfigScreen({ message }: { message: string }) {
+  return (
+    <div className="grid min-h-screen place-items-center bg-surface p-6">
+      <div className="card max-w-lg p-8 text-center">
+        <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-amber-500/12 text-amber-500">
+          <AlertTriangle className="h-6 w-6" aria-hidden="true" />
+        </span>
+        <h1 className="mt-4 text-lg font-bold">The site is not configured yet</h1>
+        <p className="mt-2 text-sm text-ink-muted">
+          The build is missing its Supabase environment variables, so there is no content
+          to display. Add them in your host&rsquo;s dashboard and redeploy.
+        </p>
+        <pre className="mt-4 overflow-x-auto rounded-xl bg-surface-sunken p-3 text-left text-xs text-ink-subtle">
+          {message}
+        </pre>
+      </div>
+    </div>
+  );
+}
