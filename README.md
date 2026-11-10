@@ -27,14 +27,16 @@ the browser talks to Supabase directly, so the whole site is a static bundle.
 | Contact | Form that writes to Supabase, plus WhatsApp |
 | Footer | Navigation, popular services, contact details, socials |
 
-Plus a **smart quote popup** that appears once per session after 45% scroll or 25
-seconds, and builds a pre-filled WhatsApp message from the visitor's answers.
+Plus a **smart quote popup** that opens from every WhatsApp button on the site —
+the nav, the hero, each service card, each pricing card, the contact section and
+the floating button — and builds a pre-filled WhatsApp message from the
+visitor's answers.
 
 **Admin panel** (`/sholab`)
 
-Nine tabs — Dashboard, Site settings, Services, Pricing, Portfolio, Reviews,
-Stats, FAQs, Messages — covering every piece of content on the site, with image
-uploads to Supabase Storage.
+Twelve tabs — Dashboard, Content, Services, Pricing, Portfolio, Testimonials,
+Media, SEO, Settings, Stats, FAQs, Messages — covering every piece of content on
+the site, with image uploads to Supabase Storage and a reset-to-default option.
 
 **Design system**
 
@@ -303,6 +305,8 @@ The suite covers the parts where a bug would be silent rather than loud:
   object paths, so it must stay within `[a-z0-9-]`), and the textarea parser.
 - **`seo.test.ts`** — the runtime canonical/`og:url` injection that replaced the
   `<link rel="canonical" href="/">` tag which broke the Vercel build.
+- **`quote.test.ts`** — the WhatsApp message builder, pinned to the exact wording
+  the brief specifies, including the no-name fallback.
 
 ---
 
@@ -316,6 +320,44 @@ The suite covers the parts where a bug would be silent rather than loud:
 | `VITE_ADMIN_PATH` | no | Admin route, defaults to `sholab` |
 | `VITE_ADMIN_REQUIRE_AUTH` | no | Set `true` after adding a login gate |
 | `VITE_SITE_URL` | no | Canonical URL for SEO (injected at runtime) |
+
+---
+
+## How to update this site
+
+Everything a visitor reads is editable from the control panel — no code, no
+redeploy. Open **`/sholab`** (also linked as *Site Control* at the bottom of the
+site footer) and use the sidebar:
+
+| To change… | Go to |
+|---|---|
+| Headline, tagline, intro, about, mission, vision, process, footer | **Content** |
+| Company name, email, phone, WhatsApp number, business hours, socials | **Content → Brand & contact** |
+| Services (add, edit, delete, reorder) | **Services** |
+| Prices, packages, the "Most popular" badge, the pricing note | **Pricing** |
+| Portfolio projects and their images | **Portfolio** |
+| Client reviews, ratings and photos | **Testimonials** |
+| Logo, favicon, hero image, CEO photo, share image | **Media** |
+| Page title, meta description, keywords, social share image | **SEO** |
+| The admin path, or to undo everything | **Settings** |
+| The counters (50+, 40+, 3+, 24/7) | **Stats** |
+| Questions and answers | **FAQs** |
+| Messages sent through the contact form | **Messages** |
+
+Press **Save** on any panel and the change is live on the public site
+immediately — the site reads from Supabase on every load, so there is nothing to
+rebuild or redeploy.
+
+**To undo a mistake:** *Settings → Danger zone → Reset to default* restores every
+service, package, project, review, stat and FAQ to the values the site shipped
+with. Contact messages are not affected.
+
+**To change the WhatsApp number** the quote popup sends to: *Content → Brand &
+contact → WhatsApp number*. Use digits only, with the country code and no `+`
+(for example `2348169781185`).
+
+**To change the admin URL:** set `VITE_ADMIN_PATH` in your Vercel environment
+variables and redeploy. The footer link follows it automatically.
 
 ---
 

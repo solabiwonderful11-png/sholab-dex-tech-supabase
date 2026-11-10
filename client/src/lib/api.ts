@@ -12,6 +12,15 @@ import type {
 } from "@shared/types";
 import { MEDIA_BUCKET, supabase } from "./supabase";
 import {
+  DEFAULT_FAQS,
+  DEFAULT_PACKAGES,
+  DEFAULT_PROJECTS,
+  DEFAULT_SERVICES,
+  DEFAULT_SETTINGS,
+  DEFAULT_STATS,
+  DEFAULT_TESTIMONIALS,
+} from "@shared/defaults";
+import {
   bySortOrder,
   faqToRow,
   packageToRow,
@@ -295,6 +304,54 @@ export async function deleteContactMessage(id: string): Promise<void> {
 }
 
 // ── Storage ─────────────────────────────────────────────────────────────────
+
+// ── Reset ────────────────────────────────────────────────────────────────────
+
+/**
+ * Restore every content table to the shipped defaults.
+ *
+ * Backs the /sholab "Reset to default" button. It clears the current rows and
+ * re-inserts the snapshot in shared/defaults.ts, so the site returns to exactly
+ * the state a fresh install starts in.
+ *
+ * The settings row is upserted rather than deleted, because it is a single
+ * well-known row (id = 'main') and deleting it would briefly leave the site with
+ * no settings at all.
+ */
+export async function resetToDefaults(): Promise<void> {
+  // 1. Clear the content tables. `.not("id", "is", null)` matches every row
+  //    without needing a sentinel id.
+  for (const table of [
+    "services",
+    "pricing_packages",
+    "projects",
+    "testimonials",
+    "stats",
+    "faqs",
+  ]) {
+    const { error } = await supabase.from(table).delete().not("id", "is", null);
+    if (error) fail(`Could not clear ${table}`, error);
+  }
+
+  // 2. Re-insert the shipped rows.
+  const inserts: [string, Record<string, unknown>[]][] = [
+    ["services", DEFAULT_SERVICES.map((s) => serviceToRow({ ...s, id: "" }))],
+    ["pricing_packages", DEFAULT_PACKAGES.map((p) => packageToRow({ ...p, id: "" }))],
+    ["projects", DEFAULT_PROJECTS.map((p) => projectToRow({ ...p, id: "" }))],
+    ["testimonials", DEFAULT_TESTIMONIALS.map((t) => testimonialToRow({ ...t, id: "" }))],
+    ["stats", DEFAULT_STATS.map((s) => statToRow({ ...s, id: "" }))],
+    ["faqs", DEFAULT_FAQS.map((f) => faqToRow({ ...f, id: "" }))],
+  ];
+
+  for (const [table, rows] of inserts) {
+    if (rows.length === 0) continue;
+    const { error } = await supabase.from(table).insert(rows);
+    if (error) fail(`Could not restore ${table}`, error);
+  }
+
+  // 3. Rewrite the settings row.
+  await saveSettings(DEFAULT_SETTINGS);
+}
 
 /**
  * Upload an image to the public media bucket and return its object path.

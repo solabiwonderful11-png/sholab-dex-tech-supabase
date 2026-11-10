@@ -1,7 +1,8 @@
-import { Mail, MapPin, MessageCircle, Phone } from "lucide-react";
-import { NAV_SECTIONS, whatsappLink } from "@shared/constants";
+import { Mail, MapPin, MessageCircle, Phone, ShieldCheck } from "lucide-react";
+import { NAV_SECTIONS } from "@shared/constants";
 import type { Service, SiteSettings } from "@shared/types";
 import { SocialIcon } from "@/components/icons/social";
+import { useQuote } from "@/hooks/useQuote";
 
 /**
  * Footer.
@@ -18,8 +19,12 @@ export function Footer({
   services: Service[];
 }) {
   const year = new Date().getFullYear();
+  const { openQuote } = useQuote();
   // A short, representative slice of services rather than all 46.
   const highlights = services.slice(0, 6);
+
+  // The control panel path is configurable, so the footer link follows it.
+  const adminPath = `/${import.meta.env.VITE_ADMIN_PATH || "sholab"}`;
 
   const go = (id: string) =>
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -117,15 +122,14 @@ export function Footer({
             </h2>
             <ul className="mt-4 space-y-3">
               <li>
-                <a
-                  href={whatsappLink(settings.whatsappNumber, `Hi ${settings.companyName}!`)}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  type="button"
+                  onClick={() => openQuote()}
                   className="flex items-start gap-2.5 text-sm text-ink-muted transition-colors hover:text-brand-500"
                 >
                   <MessageCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                   <span>WhatsApp us</span>
-                </a>
+                </button>
               </li>
               <li>
                 <a
@@ -160,7 +164,22 @@ export function Footer({
             {settings.footerCopyright ||
               `© ${year} ${settings.companyName}. All rights reserved.`}
           </p>
-          <p className="text-xs text-ink-subtle">{settings.footerCredit}</p>
+          <div className="flex items-center gap-4">
+            <p className="text-xs text-ink-subtle">{settings.footerCredit}</p>
+            {/*
+              Discreet link to the control panel (brief 7). Deliberately quiet:
+              it is for the owner, not for visitors, so it sits at the very end
+              of the footer in the smallest type on the page.
+            */}
+            <a
+              href={adminPath}
+              className="inline-flex items-center gap-1 text-xs text-ink-subtle transition-colors hover:text-brand-500"
+              title="Site control panel"
+            >
+              <ShieldCheck className="h-3 w-3" aria-hidden="true" />
+              Site Control
+            </a>
+          </div>
         </div>
       </div>
     </footer>

@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { Menu, X } from "lucide-react";
-import { NAV_SECTIONS, whatsappLink } from "@shared/constants";
+import { NAV_SECTIONS } from "@shared/constants";
 import type { SiteSettings } from "@shared/types";
 import { useScrollSpy } from "@/hooks/useScrollSpy";
+import { useQuote } from "@/hooks/useQuote";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
@@ -19,6 +20,7 @@ export function Nav({ settings }: { settings: SiteSettings }) {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const active = useScrollSpy(SECTION_IDS);
+  const { openQuote } = useQuote();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -100,14 +102,13 @@ export function Nav({ settings }: { settings: SiteSettings }) {
         {/* Actions */}
         <div className="flex items-center gap-2">
           <ThemeToggle className="hidden sm:inline-flex" />
-          <a
-            href={whatsappLink(settings.whatsappNumber, `Hi ${settings.companyName}, I'd like a quote.`)}
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            type="button"
+            onClick={() => openQuote()}
             className="btn btn-primary hidden !px-4 !py-2.5 !text-sm md:inline-flex"
           >
             Get a Quote
-          </a>
+          </button>
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
@@ -151,14 +152,16 @@ export function Nav({ settings }: { settings: SiteSettings }) {
             <ThemeToggle />
           </li>
           <li className="mt-2 px-4 pb-2">
-            <a
-              href={whatsappLink(settings.whatsappNumber, `Hi ${settings.companyName}, I'd like a quote.`)}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                openQuote();
+              }}
               className="btn btn-primary w-full"
             >
               Get a Free Quote
-            </a>
+            </button>
           </li>
         </ul>
       </div>

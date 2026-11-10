@@ -1,7 +1,7 @@
 import { ArrowRight, MessageCircle, Sparkles } from "lucide-react";
-import { whatsappLink } from "@shared/constants";
 import type { SiteSettings, Stat } from "@shared/types";
 import { useCountUp } from "@/hooks/useCountUp";
+import { useQuote } from "@/hooks/useQuote";
 import { mediaUrl } from "@/lib/supabase";
 
 /**
@@ -13,6 +13,7 @@ import { mediaUrl } from "@/lib/supabase";
  */
 export function Hero({ settings, stats }: { settings: SiteSettings; stats: Stat[] }) {
   const heroImage = mediaUrl(settings.heroImage);
+  const { openQuote } = useQuote();
 
   return (
     <section id="home" className="relative overflow-hidden pt-28 pb-16 md:pt-36 md:pb-24">
@@ -47,27 +48,22 @@ export function Hero({ settings, stats }: { settings: SiteSettings; stats: Stat[
           ) : null}
 
           <div className="mt-8 flex flex-wrap items-center gap-3">
-            <a
-              href={whatsappLink(
-                settings.whatsappNumber,
-                `Hi ${settings.companyName}, I'd like a free quote.`,
-              )}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              type="button"
+              onClick={() => openQuote()}
               className="btn btn-primary"
             >
               {settings.heroCtaPrimary}
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </a>
-            <a
-              href={whatsappLink(settings.whatsappNumber, `Hi ${settings.companyName}!`)}
-              target="_blank"
-              rel="noopener noreferrer"
+            </button>
+            <button
+              type="button"
+              onClick={() => openQuote()}
               className="btn btn-whatsapp"
             >
               <MessageCircle className="h-4 w-4" aria-hidden="true" />
               {settings.heroCtaSecondary}
-            </a>
+            </button>
           </div>
 
           {/* Trust line */}

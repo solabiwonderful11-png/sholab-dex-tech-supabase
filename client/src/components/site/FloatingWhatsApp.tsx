@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { ArrowUp, MessageCircle } from "lucide-react";
-import { whatsappLink } from "@shared/constants";
-import type { SiteSettings } from "@shared/types";
+import { useQuote } from "@/hooks/useQuote";
 import { cn } from "@/lib/utils";
 
 /**
@@ -12,8 +11,9 @@ import { cn } from "@/lib/utils";
  * without being a modal or a banner — it is noticeable but never blocks
  * content, and it stops after a few cycles so it does not become noise.
  */
-export function FloatingWhatsApp({ settings }: { settings: SiteSettings }) {
+export function FloatingWhatsApp() {
   const [showTop, setShowTop] = useState(false);
+  const { openQuote } = useQuote();
 
   useEffect(() => {
     const onScroll = () => setShowTop(window.scrollY > 900);
@@ -37,13 +37,9 @@ export function FloatingWhatsApp({ settings }: { settings: SiteSettings }) {
         <ArrowUp className="h-4 w-4" aria-hidden="true" />
       </button>
 
-      <a
-        href={whatsappLink(
-          settings.whatsappNumber,
-          `Hi ${settings.companyName}, I'd like to know more about your services.`,
-        )}
-        target="_blank"
-        rel="noopener noreferrer"
+      <button
+        type="button"
+        onClick={() => openQuote()}
         aria-label="Chat with us on WhatsApp"
         className="group relative grid h-14 w-14 place-items-center rounded-full bg-[#25d366] text-white shadow-[0_18px_44px_-14px_rgba(37,211,102,0.7)] transition-transform duration-300 hover:scale-105"
       >
@@ -58,7 +54,7 @@ export function FloatingWhatsApp({ settings }: { settings: SiteSettings }) {
         <span className="pointer-events-none absolute right-full mr-3 hidden whitespace-nowrap rounded-lg bg-ink px-3 py-1.5 text-xs font-semibold text-ink-inverse opacity-0 transition-opacity duration-200 group-hover:opacity-100 lg:block">
           Chat with us
         </span>
-      </a>
+      </button>
     </div>
   );
 }

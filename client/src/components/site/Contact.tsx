@@ -1,10 +1,20 @@
 import { useState, type FormEvent, type ReactNode } from "react";
-import { CheckCircle2, Clock, Loader2, Mail, MessageCircle, Phone, Send } from "lucide-react";
-import { whatsappLink } from "@shared/constants";
-import type { SiteSettings } from "@shared/types";
+import {
+  CheckCircle2,
+  Clock,
+  Loader2,
+  Mail,
+  MapPin,
+  MessageCircle,
+  Phone,
+  Send,
+} from "lucide-react";
+import { CATEGORIES, CATEGORY_LABELS } from "@shared/constants";
+import type { Service, SiteSettings } from "@shared/types";
 import { Section } from "@/components/ui/Section";
 import { Reveal } from "@/components/ui/Reveal";
 import { useSubmitContact } from "@/hooks/useSiteContent";
+import { useQuote } from "@/hooks/useQuote";
 
 /**
  * Contact section: details on the left, form on the right.
@@ -12,11 +22,21 @@ import { useSubmitContact } from "@/hooks/useSiteContent";
  * The form writes to Supabase, and the WhatsApp button is offered alongside it
  * because for this business WhatsApp is the channel people actually use — the
  * form is the fallback, not the primary path.
+ *
+ * The "Service Needed" dropdown lists the three categories and the services
+ * inside each, grouped with <optgroup>, as the brief asks (1.11).
  */
-export function Contact({ settings }: { settings: SiteSettings }) {
+export function Contact({
+  settings,
+  services,
+}: {
+  settings: SiteSettings;
+  services: Service[];
+}) {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const submit = useSubmitContact();
+  const { openQuote } = useQuote();
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -60,7 +80,7 @@ export function Contact({ settings }: { settings: SiteSettings }) {
                 icon={<MessageCircle className="h-4 w-4" />}
                 label="WhatsApp (fastest)"
                 value={settings.phone}
-                href={whatsappLink(settings.whatsappNumber, `Hi ${settings.companyName}!`)}
+                onClick={() => openQuote()}
               />
               <ContactRow
                 icon={<Phone className="h-4 w-4" />}
@@ -85,18 +105,28 @@ export function Contact({ settings }: { settings: SiteSettings }) {
           </Reveal>
 
           <Reveal delay={80}>
-            <a
-              href={whatsappLink(
-                settings.whatsappNumber,
-                `Hi ${settings.companyName}, I'd like a free quote.`,
-              )}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              type="button"
+              onClick={() => openQuote()}
               className="btn btn-whatsapp mt-6 w-full"
             >
               <MessageCircle className="h-4 w-4" aria-hidden="true" />
               Chat on WhatsApp
-            </a>
+            </button>
+          </Reveal>
+
+          {/* Map placeholder — brief 1.11. Clearly marked so a real Google Map
+              embed can be dropped in later without hunting for the spot. */}
+          <Reveal delay={120}>
+            <div className="mt-6 grid h-48 place-items-center rounded-2xl border-2 border-dashed border-line-strong bg-surface-raised text-center">
+              <div className="px-6">
+                <MapPin className="mx-auto h-6 w-6 text-ink-subtle" aria-hidden="true" />
+                <p className="mt-2 text-sm font-semibold">Map placeholder</p>
+                <p className="mt-1 text-xs text-ink-subtle">
+                  Embed a Google Map here later.
+                </p>
+              </div>
+            </div>
           </Reveal>
         </div>
 
@@ -172,14 +202,25 @@ export function Contact({ settings }: { settings: SiteSettings }) {
 
                   <div>
                     <label className="label" htmlFor="c-service">
-                      What do you need?
+                      Service needed
                     </label>
                     <select id="c-service" name="service" className="field" defaultValue="">
                       <option value="">Select a service (optional)</option>
-                      <option value="websites">Website</option>
-                      <option value="automation">AI Automation</option>
-                      <option value="promotions">Business Promotion</option>
-                      <option value="other">Something else</option>
+                      {CATEGORIES.map((c) => (
+                        <optgroup key={c} label={CATEGORY_LABELS[c]}>
+                          <option value={CATEGORY_LABELS[c]}>
+                            {CATEGORY_LABELS[c]} — general enquiry
+                          </option>
+                          {services
+                            .filter((s) => s.category === c)
+                            .map((s) => (
+                              <option key={s.id} value={s.name}>
+                                {s.name}
+                              </option>
+                            ))}
+                        </optgroup>
+                      ))}
+                      <option value="Something else">Something else</option>
                     </select>
                   </div>
 
@@ -243,11 +284,13 @@ function ContactRow({
   label,
   value,
   href,
+  onClick,
 }: {
   icon: ReactNode;
   label: string;
   value: string;
   href?: string;
+  onClick?: () => void;
 }) {
   const inner = (
     <div className="card flex items-center gap-4 p-4 transition-colors hover:border-brand-500/50">
@@ -262,6 +305,14 @@ function ContactRow({
       </div>
     </div>
   );
+
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className="block w-full text-left">
+        {inner}
+      </button>
+    );
+  }
 
   return href ? (
     <a href={href} target="_blank" rel="noopener noreferrer" className="block">

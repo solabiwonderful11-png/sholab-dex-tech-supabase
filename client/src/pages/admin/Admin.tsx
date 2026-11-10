@@ -3,11 +3,14 @@ import {
   BarChart3,
   Briefcase,
   DollarSign,
+  FileText,
   HelpCircle,
+  Image as ImageIcon,
   Inbox,
   LayoutDashboard,
   LogOut,
   MessageSquareQuote,
+  Search,
   Settings as SettingsIcon,
   Sparkles,
   Wrench,
@@ -19,7 +22,6 @@ import type {
   Project,
   Service,
   ServiceCategory,
-  SiteSettings,
   Stat,
   Testimonial,
 } from "@shared/types";
@@ -36,7 +38,6 @@ import {
   deleteService,
   deleteStat,
   deleteTestimonial,
-  saveSettings,
   setPopularPackage,
   updateFaq,
   updatePackage,
@@ -51,13 +52,13 @@ import { formatDateTime, linesToArray } from "@/lib/utils";
 import { useContactMessages, useDeleteContactMessage, useRefreshSiteContent, useSiteContent } from "@/hooks/useSiteContent";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { LoadingScreen, ErrorScreen } from "@/components/Screen";
+import { ContentTab, MediaTab, SeoTab, SettingsTab } from "./settings-tabs";
 import {
   DeleteButton,
   Field,
   IconButton,
   ImageField,
   Modal,
-  PairListEditor,
   Panel,
   SaveButton,
   Select,
@@ -80,22 +81,34 @@ import {
 
 type TabId =
   | "dashboard"
-  | "settings"
+  | "content"
   | "services"
   | "pricing"
   | "projects"
   | "testimonials"
+  | "media"
+  | "seo"
+  | "settings"
   | "stats"
   | "faqs"
   | "messages";
 
+/**
+ * The sidebar, in the order the brief lists it (8.10):
+ * Dashboard, Content, Services, Pricing, Portfolio, Testimonials, Media, SEO,
+ * Settings — plus Stats, FAQs and Messages, which the brief's Section 8 also
+ * requires to be editable.
+ */
 const TABS: { id: TabId; label: string; Icon: typeof LayoutDashboard }[] = [
   { id: "dashboard", label: "Dashboard", Icon: LayoutDashboard },
-  { id: "settings", label: "Site settings", Icon: SettingsIcon },
+  { id: "content", label: "Content", Icon: FileText },
   { id: "services", label: "Services", Icon: Wrench },
   { id: "pricing", label: "Pricing", Icon: DollarSign },
   { id: "projects", label: "Portfolio", Icon: Briefcase },
-  { id: "testimonials", label: "Reviews", Icon: MessageSquareQuote },
+  { id: "testimonials", label: "Testimonials", Icon: MessageSquareQuote },
+  { id: "media", label: "Media", Icon: ImageIcon },
+  { id: "seo", label: "SEO", Icon: Search },
+  { id: "settings", label: "Settings", Icon: SettingsIcon },
   { id: "stats", label: "Stats", Icon: BarChart3 },
   { id: "faqs", label: "FAQs", Icon: HelpCircle },
   { id: "messages", label: "Messages", Icon: Inbox },
@@ -160,13 +173,16 @@ export function Admin() {
         {/* Content */}
         <div className="space-y-6 lg:col-span-9">
           {tab === "dashboard" ? <Dashboard content={data} onGoTo={setTab} /> : null}
-          {tab === "settings" ? <SettingsTab settings={data.settings} /> : null}
+          {tab === "content" ? <ContentTab settings={data.settings} /> : null}
           {tab === "services" ? <ServicesTab services={data.services} /> : null}
           {tab === "pricing" ? <PricingTab packages={data.packages} /> : null}
           {tab === "projects" ? <ProjectsTab projects={data.projects} /> : null}
           {tab === "testimonials" ? (
             <TestimonialsTab testimonials={data.testimonials} />
           ) : null}
+          {tab === "media" ? <MediaTab settings={data.settings} /> : null}
+          {tab === "seo" ? <SeoTab settings={data.settings} /> : null}
+          {tab === "settings" ? <SettingsTab settings={data.settings} /> : null}
           {tab === "stats" ? <StatsTab stats={data.stats} /> : null}
           {tab === "faqs" ? <FaqsTab faqs={data.faqs} /> : null}
           {tab === "messages" ? <MessagesTab /> : null}
@@ -255,300 +271,6 @@ function Dashboard({
           </ul>
         )}
       </Panel>
-    </>
-  );
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-// Site settings
-// ════════════════════════════════════════════════════════════════════════════
-
-function SettingsTab({ settings }: { settings: SiteSettings }) {
-  const [draft, setDraft] = useState<SiteSettings>(settings);
-  const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
-  const refresh = useRefreshSiteContent();
-
-  // Re-sync when the underlying content changes (e.g. after a save elsewhere).
-  useEffect(() => setDraft(settings), [settings]);
-
-  const set = <K extends keyof SiteSettings>(key: K, value: SiteSettings[K]) =>
-    setDraft((d) => ({ ...d, [key]: value }));
-
-  async function onUpload(key: keyof SiteSettings, file: File) {
-    setUploading(String(key));
-    try {
-      const path = await uploadImage(file, "site");
-      set(key, path as SiteSettings[typeof key]);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Upload failed");
-    } finally {
-      setUploading(null);
-    }
-  }
-
-  async function onSave() {
-    setSaving(true);
-    setSaved(false);
-    try {
-      await saveSettings(draft);
-      await refresh();
-      setSaved(true);
-      window.setTimeout(() => setSaved(false), 2500);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Could not save");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <>
-      <Panel
-        title="Brand & contact"
-        description="The company name, contact details and social links used across the site."
-        actions={<SaveButton onClick={onSave} saving={saving} />}
-      >
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Company name">
-            <TextInput value={draft.companyName} onChange={(v) => set("companyName", v)} />
-          </Field>
-          <Field label="Business hours">
-            <TextInput
-              value={draft.businessHours}
-              onChange={(v) => set("businessHours", v)}
-              placeholder="Mon–Sat, 9am–6pm"
-            />
-          </Field>
-          <Field label="Phone (displayed)">
-            <TextInput value={draft.phone} onChange={(v) => set("phone", v)} />
-          </Field>
-          <Field label="WhatsApp number" hint="Digits only, with country code. e.g. 2348169781185">
-            <TextInput
-              value={draft.whatsappNumber}
-              onChange={(v) => set("whatsappNumber", v)}
-            />
-          </Field>
-          <Field label="Email">
-            <TextInput value={draft.email} onChange={(v) => set("email", v)} />
-          </Field>
-        </div>
-
-        <div className="mt-6 grid gap-4 sm:grid-cols-2">
-          <ImageField
-            label="Logo"
-            value={mediaUrl(draft.logo)}
-            onChange={(v) => set("logo", v)}
-            onUpload={(f) => void onUpload("logo", f)}
-            uploading={uploading === "logo"}
-            hint="Square image works best."
-          />
-          <ImageField
-            label="CEO photo"
-            value={mediaUrl(draft.ceoPhoto)}
-            onChange={(v) => set("ceoPhoto", v)}
-            onUpload={(f) => void onUpload("ceoPhoto", f)}
-            uploading={uploading === "ceoPhoto"}
-          />
-        </div>
-
-        <div className="mt-6">
-          <span className="label">Social links</span>
-          <div className="space-y-2">
-            {draft.socials.map((s, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <input
-                  className="field !py-1.5 !text-sm"
-                  value={s.label}
-                  placeholder="Label (e.g. Facebook)"
-                  onChange={(e) =>
-                    set(
-                      "socials",
-                      draft.socials.map((x, idx) =>
-                        idx === i ? { ...x, label: e.target.value } : x,
-                      ),
-                    )
-                  }
-                />
-                <input
-                  className="field !py-1.5 !text-sm"
-                  value={s.url}
-                  placeholder="https://…"
-                  onChange={(e) =>
-                    set(
-                      "socials",
-                      draft.socials.map((x, idx) =>
-                        idx === i ? { ...x, url: e.target.value } : x,
-                      ),
-                    )
-                  }
-                />
-                <IconButton
-                  onClick={() =>
-                    set(
-                      "socials",
-                      draft.socials.filter((_, idx) => idx !== i),
-                    )
-                  }
-                  label="Remove link"
-                  danger
-                >
-                  <span className="text-sm">×</span>
-                </IconButton>
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={() => set("socials", [...draft.socials, { label: "", url: "" }])}
-              className="btn btn-ghost !py-2 !text-xs"
-            >
-              + Add social link
-            </button>
-          </div>
-        </div>
-      </Panel>
-
-      <Panel
-        title="Hero"
-        description="The first thing visitors see."
-        actions={<SaveButton onClick={onSave} saving={saving} />}
-      >
-        <div className="space-y-4">
-          <Field label="Headline">
-            <TextInput value={draft.heroHeadline} onChange={(v) => set("heroHeadline", v)} />
-          </Field>
-          <Field label="Tagline">
-            <TextInput value={draft.heroTagline} onChange={(v) => set("heroTagline", v)} />
-          </Field>
-          <Field label="Intro paragraph">
-            <TextArea value={draft.heroIntro} onChange={(v) => set("heroIntro", v)} />
-          </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Primary button text">
-              <TextInput
-                value={draft.heroCtaPrimary}
-                onChange={(v) => set("heroCtaPrimary", v)}
-              />
-            </Field>
-            <Field label="Secondary button text">
-              <TextInput
-                value={draft.heroCtaSecondary}
-                onChange={(v) => set("heroCtaSecondary", v)}
-              />
-            </Field>
-          </div>
-          <ImageField
-            label="Hero image"
-            value={mediaUrl(draft.heroImage)}
-            onChange={(v) => set("heroImage", v)}
-            onUpload={(f) => void onUpload("heroImage", f)}
-            uploading={uploading === "heroImage"}
-            hint="Leave empty to show the built-in branded panel instead."
-          />
-        </div>
-      </Panel>
-
-      <Panel
-        title="About"
-        description="Your story, mission, vision and the reasons clients choose you."
-        actions={<SaveButton onClick={onSave} saving={saving} />}
-      >
-        <div className="space-y-4">
-          <Field label="Section heading">
-            <TextInput value={draft.aboutHeading} onChange={(v) => set("aboutHeading", v)} />
-          </Field>
-          <Field label="About text">
-            <TextArea rows={5} value={draft.aboutBody} onChange={(v) => set("aboutBody", v)} />
-          </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Mission">
-              <TextArea value={draft.mission} onChange={(v) => set("mission", v)} />
-            </Field>
-            <Field label="Vision">
-              <TextArea value={draft.vision} onChange={(v) => set("vision", v)} />
-            </Field>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="CEO name">
-              <TextInput value={draft.ceoName} onChange={(v) => set("ceoName", v)} />
-            </Field>
-            <Field label="CEO title">
-              <TextInput value={draft.ceoTitle} onChange={(v) => set("ceoTitle", v)} />
-            </Field>
-          </div>
-          <Field label="CEO bio">
-            <TextArea value={draft.ceoBio} onChange={(v) => set("ceoBio", v)} />
-          </Field>
-
-          <div>
-            <span className="label">Why choose us</span>
-            <PairListEditor
-              items={draft.whyChooseUs}
-              onChange={(v) => set("whyChooseUs", v)}
-              titlePlaceholder="Reason (e.g. Fast delivery)"
-              descriptionPlaceholder="One line explaining it"
-            />
-          </div>
-
-          <div>
-            <span className="label">Process steps</span>
-            <PairListEditor
-              items={draft.processSteps}
-              onChange={(v) => set("processSteps", v)}
-              titlePlaceholder="Step name"
-              descriptionPlaceholder="What happens at this step"
-            />
-          </div>
-        </div>
-      </Panel>
-
-      <Panel
-        title="Footer & SEO"
-        description="Footer text, plus the title and description search engines show."
-        actions={<SaveButton onClick={onSave} saving={saving} />}
-      >
-        <div className="space-y-4">
-          <Field label="Footer description">
-            <TextArea
-              value={draft.footerDescription}
-              onChange={(v) => set("footerDescription", v)}
-            />
-          </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Copyright line">
-              <TextInput
-                value={draft.footerCopyright}
-                onChange={(v) => set("footerCopyright", v)}
-              />
-            </Field>
-            <Field label="Credit line">
-              <TextInput value={draft.footerCredit} onChange={(v) => set("footerCredit", v)} />
-            </Field>
-          </div>
-          <Field label="Pricing note" hint="Shown under the pricing cards.">
-            <TextArea value={draft.pricingNote} onChange={(v) => set("pricingNote", v)} />
-          </Field>
-          <Field label="SEO title">
-            <TextInput value={draft.seoTitle} onChange={(v) => set("seoTitle", v)} />
-          </Field>
-          <Field label="SEO description">
-            <TextArea value={draft.seoDescription} onChange={(v) => set("seoDescription", v)} />
-          </Field>
-          <Field label="SEO keywords" hint="Comma separated.">
-            <TextInput value={draft.seoKeywords} onChange={(v) => set("seoKeywords", v)} />
-          </Field>
-        </div>
-      </Panel>
-
-      <div className="sticky bottom-4 flex items-center justify-end gap-3">
-        {saved ? (
-          <span className="rounded-full bg-brand-500/12 px-3 py-1.5 text-xs font-semibold text-brand-600 dark:text-brand-300">
-            Saved
-          </span>
-        ) : null}
-        <SaveButton onClick={onSave} saving={saving} label="Save all settings" />
-      </div>
     </>
   );
 }

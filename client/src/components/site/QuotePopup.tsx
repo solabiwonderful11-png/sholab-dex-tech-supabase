@@ -1,92 +1,120 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MessageCircle, X } from "lucide-react";
-import { CATEGORY_LABELS, whatsappLink } from "@shared/constants";
-import type { PricingPackage, ServiceCategory, SiteSettings } from "@shared/types";
+import { CATEGORIES, CATEGORY_LABELS, whatsappLink } from "@shared/constants";
+import type {
+  PricingPackage,
+  Service,
+  ServiceCategory,
+  SiteSettings,
+} from "@shared/types";
+import { buildQuoteMessage, packageLabel } from "@/lib/quote";
+import { useQuote } from "@/hooks/useQuote";
 import { cn } from "@/lib/utils";
 
-const SEEN_KEY = "sholab-quote-popup-seen";
-
 /**
- * Smart quote popup.
+ * The WhatsApp smart-quote popup.
  *
- * Appears once per session after the visitor has shown real interest — either
- * they have scrolled a good way down the page, or they have been on it long
- * enough to be reading. Firing it on load would be the classic mistake: it
- * interrupts before there is anything to interrupt.
+ * Built to the brief's Section 4 exactly:
  *
- * The "smart" part is that it builds the WhatsApp message from what the visitor
- * picks, so the owner receives a pre-qualified enquiry instead of "hi".
+ *   1. "Your Name" — one text input, required
+ *   2. Service selector — the services, grouped by the three categories
+ *   3. Package / pricing selector — the tiers for the chosen category
+ *   4. "Send on WhatsApp"
+ *
+ * and it opens WhatsApp with:
+ *
+ *   Hi Sholab Dex Tech, my name is [NAME]. I am interested in
+ *   [SERVICE] - [PACKAGE/PRICING]. Please send me more details and a quote.
+ *
+ * The name is required by the form, but the message builder still handles an
+ * empty name gracefully (it drops the "my name is" clause) so a visitor who
+ * clears the field after typing never sends a broken sentence.
+ *
+ * Every WhatsApp button on the site opens this popup through `useQuote()`, which
+ * is what makes the name capture universal — including the floating button.
  */
 export function QuotePopup({
   settings,
+  services,
   packages,
 }: {
   settings: SiteSettings;
+  services: Service[];
   packages: PricingPackage[];
 }) {
-  const [open, setOpen] = useState(false);
+  const { isOpen, request, closeQuote } = useQuote();
+
+  const [name, setName] = useState("");
   const [category, setCategory] = useState<ServiceCategory>("websites");
-  const [packageName, setPackageName] = useState("");
-  const [budget, setBudget] = useState("");
-  const [timeline, setTimeline] = useState("");
+  const [serviceName, setServiceName] = useState("");
+  const [packageId, setPackageId] = useState("");
+  const [touched, setTouched] = useState(false);
 
-  // Trigger: 45% scrolled, or 25 seconds on the page. Whichever comes first.
+  /**
+   * Apply the caller's pre-selection each time the popup opens.
+   *
+   * This runs on `isOpen` rather than on mount because the popup stays mounted
+   * between openings — without the reset, a visitor who opened it from the
+   * "E-commerce Store" card would see that selection again when they later
+   * clicked the nav's generic "Get a Quote".
+   */
   useEffect(() => {
-    if (sessionStorage.getItem(SEEN_KEY)) return;
+    if (!isOpen) return;
 
-    let done = false;
-    const show = () => {
-      if (done) return;
-      done = true;
-      setOpen(true);
-      sessionStorage.setItem(SEEN_KEY, "1");
-      cleanup();
-    };
+    const pkg = request.packageId
+      ? packages.find((p) => p.id === request.packageId)
+      : undefined;
 
-    const onScroll = () => {
-      const scrolled =
-        window.scrollY / Math.max(1, document.body.scrollHeight - window.innerHeight);
-      if (scrolled > 0.45) show();
-    };
+    // A package implies its category, so the tabs stay in sync with the card
+    // the visitor actually clicked.
+    const nextCategory = pkg?.category ?? request.category ?? "websites";
 
-    const timer = window.setTimeout(show, 25_000);
-
-    function cleanup() {
-      window.removeEventListener("scroll", onScroll);
-      window.clearTimeout(timer);
-    }
-
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return cleanup;
-  }, []);
+    setCategory(nextCategory);
+    setServiceName(request.serviceName ?? "");
+    setPackageId(pkg?.id ?? "");
+    setTouched(false);
+  }, [isOpen, request, packages]);
 
   // Escape closes it, and body scroll is locked while it is open.
   useEffect(() => {
-    if (!open) return;
+    if (!isOpen) return;
+
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") closeQuote();
     };
+
     document.addEventListener("keydown", onKey);
+    const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+
     return () => {
       document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
+      document.body.style.overflow = previous;
     };
-  }, [open]);
+  }, [isOpen, closeQuote]);
 
-  if (!open) return null;
+  const categoryServices = useMemo(
+    () => services.filter((s) => s.category === category),
+    [services, category],
+  );
 
-  const options = packages.filter((p) => p.category === category);
+  const categoryPackages = useMemo(
+    () => packages.filter((p) => p.category === category),
+    [packages, category],
+  );
 
-  const message = [
-    `Hi ${settings.companyName}, I'd like a quote.`,
-    `Service: ${CATEGORY_LABELS[category]}`,
-    packageName ? `Package: ${packageName}` : null,
-    budget ? `Budget: ${budget}` : null,
-    timeline ? `Timeline: ${timeline}` : null,
-  ]
-    .filter(Boolean)
-    .join("\n");
+  if (!isOpen) return null;
+
+  const selectedPackage = categoryPackages.find((p) => p.id === packageId);
+  const nameMissing = touched && name.trim().length === 0;
+
+  const message = buildQuoteMessage(settings.companyName, {
+    name,
+    service: serviceName || CATEGORY_LABELS[category],
+    packageLabel: selectedPackage ? packageLabel(selectedPackage) : "",
+  });
+
+  const href = whatsappLink(settings.whatsappNumber, message);
 
   return (
     <div
@@ -95,18 +123,18 @@ export function QuotePopup({
       aria-modal="true"
       aria-labelledby="quote-title"
     >
-      {/* Backdrop */}
+      {/* Backdrop — a button so a click outside closes it, as the brief asks. */}
       <button
         type="button"
         aria-label="Close"
-        onClick={() => setOpen(false)}
+        onClick={closeQuote}
         className="absolute inset-0 cursor-default bg-black/50 backdrop-blur-sm"
       />
 
-      <div className="glass-strong relative w-full max-w-lg animate-[reveal_0.5s_var(--ease-premium)_both] rounded-3xl p-6 sm:p-7">
+      <div className="glass-strong relative max-h-[92vh] w-full max-w-lg animate-[reveal_0.5s_var(--ease-premium)_both] overflow-y-auto rounded-3xl p-6 sm:p-7">
         <button
           type="button"
-          onClick={() => setOpen(false)}
+          onClick={closeQuote}
           aria-label="Close"
           className="absolute right-4 top-4 grid h-8 w-8 place-items-center rounded-full text-ink-subtle transition-colors hover:bg-surface-sunken hover:text-ink"
         >
@@ -118,25 +146,61 @@ export function QuotePopup({
         </span>
 
         <h2 id="quote-title" className="mt-4 text-lg font-bold">
-          Get a free quote in 30 seconds
+          Get a quote on WhatsApp
         </h2>
         <p className="mt-1.5 text-sm text-ink-muted">
-          Answer three quick questions and we will open WhatsApp with your details ready to
-          send.
+          Tell us who you are and what you need — we will open WhatsApp with your
+          message ready to send.
         </p>
 
-        <div className="mt-5 space-y-4">
-          {/* Category */}
+        <form
+          className="mt-5 space-y-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            setTouched(true);
+            if (!name.trim()) return;
+            window.open(href, "_blank", "noopener,noreferrer");
+            closeQuote();
+          }}
+        >
+          {/* 1. Name — required, per the brief. */}
+          <div>
+            <label className="label" htmlFor="q-name">
+              Your Name *
+            </label>
+            <input
+              id="q-name"
+              name="name"
+              required
+              maxLength={80}
+              autoComplete="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onBlur={() => setTouched(true)}
+              aria-invalid={nameMissing || undefined}
+              aria-describedby={nameMissing ? "q-name-error" : undefined}
+              className={cn("field", nameMissing && "border-red-500/60")}
+              placeholder="e.g. John"
+            />
+            {nameMissing ? (
+              <p id="q-name-error" role="alert" className="mt-1.5 text-xs text-red-500">
+                Please enter your name so we know who we are talking to.
+              </p>
+            ) : null}
+          </div>
+
+          {/* 2. Service — grouped by the three categories. */}
           <div>
             <span className="label">What do you need?</span>
             <div className="flex flex-wrap gap-2">
-              {(Object.keys(CATEGORY_LABELS) as ServiceCategory[]).map((c) => (
+              {CATEGORIES.map((c) => (
                 <button
                   key={c}
                   type="button"
                   onClick={() => {
                     setCategory(c);
-                    setPackageName("");
+                    setServiceName("");
+                    setPackageId("");
                   }}
                   aria-pressed={category === c}
                   className={cn(
@@ -150,82 +214,66 @@ export function QuotePopup({
                 </button>
               ))}
             </div>
+
+            <label className="sr-only" htmlFor="q-service">
+              Service
+            </label>
+            <select
+              id="q-service"
+              className="field mt-2.5"
+              value={serviceName}
+              onChange={(e) => setServiceName(e.target.value)}
+            >
+              <option value="">
+                {CATEGORY_LABELS[category]} — not sure which one
+              </option>
+              {categoryServices.map((s) => (
+                <option key={s.id} value={s.name}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
           </div>
 
-          {/* Package */}
-          {options.length > 0 ? (
-            <div>
-              <label className="label" htmlFor="q-package">
-                Which package?
-              </label>
-              <select
-                id="q-package"
-                className="field"
-                value={packageName}
-                onChange={(e) => setPackageName(e.target.value)}
-              >
-                <option value="">Not sure yet</option>
-                {options.map((p) => (
-                  <option key={p.id} value={`${p.name} (${p.priceNgn})`}>
-                    {p.name} — {p.priceNgn}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : null}
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="label" htmlFor="q-budget">
-                Budget
-              </label>
-              <select
-                id="q-budget"
-                className="field"
-                value={budget}
-                onChange={(e) => setBudget(e.target.value)}
-              >
-                <option value="">Prefer not to say</option>
-                <option value="Under ₦100,000">Under ₦100,000</option>
-                <option value="₦100,000 – ₦300,000">₦100,000 – ₦300,000</option>
-                <option value="₦300,000 – ₦600,000">₦300,000 – ₦600,000</option>
-                <option value="Above ₦600,000">Above ₦600,000</option>
-              </select>
-            </div>
-            <div>
-              <label className="label" htmlFor="q-timeline">
-                Timeline
-              </label>
-              <select
-                id="q-timeline"
-                className="field"
-                value={timeline}
-                onChange={(e) => setTimeline(e.target.value)}
-              >
-                <option value="">Flexible</option>
-                <option value="As soon as possible">As soon as possible</option>
-                <option value="Within 2 weeks">Within 2 weeks</option>
-                <option value="Within a month">Within a month</option>
-                <option value="Just planning">Just planning</option>
-              </select>
-            </div>
+          {/* 3. Package / pricing for the chosen category. */}
+          <div>
+            <label className="label" htmlFor="q-package">
+              Package / Pricing
+            </label>
+            <select
+              id="q-package"
+              className="field"
+              value={packageId}
+              onChange={(e) => setPackageId(e.target.value)}
+            >
+              <option value="">Not sure yet — send me options</option>
+              {categoryPackages.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} — {p.priceNgn}
+                  {p.priceUsd ? ` / ${p.priceUsd}` : ""}
+                </option>
+              ))}
+            </select>
           </div>
-        </div>
 
-        <a
-          href={whatsappLink(settings.whatsappNumber, message)}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={() => setOpen(false)}
-          className="btn btn-whatsapp mt-6 w-full"
-        >
-          <MessageCircle className="h-4 w-4" aria-hidden="true" />
-          Send on WhatsApp
-        </a>
+          {/* Live preview of exactly what will be sent. */}
+          <div className="rounded-xl border border-line bg-surface-sunken/70 p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-subtle">
+              Message preview
+            </p>
+            <p className="mt-1.5 text-xs leading-relaxed text-ink-muted">{message}</p>
+          </div>
+
+          {/* 4. Send. */}
+          <button type="submit" className="btn btn-whatsapp w-full">
+            <MessageCircle className="h-4 w-4" aria-hidden="true" />
+            Send on WhatsApp
+          </button>
+        </form>
 
         <button
           type="button"
-          onClick={() => setOpen(false)}
+          onClick={closeQuote}
           className="mt-3 w-full text-center text-xs text-ink-subtle transition-colors hover:text-ink"
         >
           Maybe later

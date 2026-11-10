@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import type { SiteContent } from "@shared/types";
+import { applySiteSeo } from "@/lib/seo";
 import { Nav } from "@/components/site/Nav";
 import { Hero } from "@/components/site/Hero";
 import { Services } from "@/components/site/Services";
@@ -13,6 +14,7 @@ import { Contact } from "@/components/site/Contact";
 import { Footer } from "@/components/site/Footer";
 import { FloatingWhatsApp } from "@/components/site/FloatingWhatsApp";
 import { QuotePopup } from "@/components/site/QuotePopup";
+import { QuoteProvider } from "@/hooks/useQuote";
 
 /**
  * The public site.
@@ -21,32 +23,22 @@ import { QuotePopup } from "@/components/site/QuotePopup";
  * prove it, pricing removes the biggest objection, and only then does the page
  * ask for anything. Contact sits last, after the visitor has had every chance
  * to be convinced.
+ *
+ * Everything is wrapped in QuoteProvider so any WhatsApp button anywhere in the
+ * tree can open the quote popup with its own pre-selection — the mechanism the
+ * brief's Section 4 depends on.
  */
 export function Home({ content }: { content: SiteContent }) {
   const { settings } = content;
 
-  // Keep the document title and meta description in sync with the CMS, so an
-  // edit in /sholab is reflected in the tab and in search results.
+  // Keep the document title, meta description, Open Graph tags and favicon in
+  // sync with the CMS, so an edit in /sholab is reflected without a redeploy.
   useEffect(() => {
-    if (settings.seoTitle) document.title = settings.seoTitle;
-
-    const setMeta = (name: string, value: string) => {
-      if (!value) return;
-      let tag = document.querySelector<HTMLMetaElement>(`meta[name="${name}"]`);
-      if (!tag) {
-        tag = document.createElement("meta");
-        tag.name = name;
-        document.head.appendChild(tag);
-      }
-      tag.content = value;
-    };
-
-    setMeta("description", settings.seoDescription);
-    setMeta("keywords", settings.seoKeywords);
-  }, [settings.seoTitle, settings.seoDescription, settings.seoKeywords]);
+    applySiteSeo(settings);
+  }, [settings]);
 
   return (
-    <>
+    <QuoteProvider>
       {/* Skip link — the first thing a keyboard user reaches. */}
       <a
         href="#services"
@@ -66,13 +58,17 @@ export function Home({ content }: { content: SiteContent }) {
         <Process settings={settings} />
         <Testimonials testimonials={content.testimonials} />
         <Faq faqs={content.faqs} />
-        <Contact settings={settings} />
+        <Contact settings={settings} services={content.services} />
       </main>
 
       <Footer settings={settings} services={content.services} />
 
-      <FloatingWhatsApp settings={settings} />
-      <QuotePopup settings={settings} packages={content.packages} />
-    </>
+      <FloatingWhatsApp />
+      <QuotePopup
+        settings={settings}
+        services={content.services}
+        packages={content.packages}
+      />
+    </QuoteProvider>
   );
 }
