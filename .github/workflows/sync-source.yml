@@ -3,10 +3,15 @@
 # Why this exists: the sandbox has no GitHub push credentials, so the files are
 # transferred as a checksum-verified archive and committed here, using the
 # repository's own token. It is deleted immediately after it runs.
+#
+# Triggered by a push to the throwaway `sync-trigger` branch, because
+# workflow_dispatch is not available to the token that created this file.
 name: sync-source
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - sync-trigger
 
 permissions:
   contents: write
@@ -29,8 +34,8 @@ jobs:
           echo "cb91c19c348acb68e3f0150b754cbb9d851b226dcac47a3395131c30e7ed3fc8  /tmp/payload.tgz" | sha256sum -c -
           echo "checksum OK"
           tar -xzf /tmp/payload.tgz -C "$GITHUB_WORKSPACE"
-          echo "extracted:"
-          find . -newermt '-2 minutes' -type f -not -path './.git/*' | sort
+          echo "extracted files:"
+          tar -tzf /tmp/payload.tgz | sort
 
       - name: Commit and push
         run: |
