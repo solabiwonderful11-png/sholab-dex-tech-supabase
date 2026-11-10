@@ -47,7 +47,5 @@ jobs:
             echo "No changes to commit"
             exit 0
           fi
-          git commit -F /tmp/commitmsg.txt
+          git commit -m "feat: implement website brief v2 (WhatsApp quote popup, per-card CTAs, pricing table, admin Media/SEO/Settings tabs)"
           git push origin HEAD:main
-        env:
-          COMMIT_MSG: "feat: implement website brief v2 (WhatsApp quote popup, per-card CTAs, pricing table, admin Media/SEO/Settings tabs)"
